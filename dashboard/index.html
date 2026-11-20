@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบตรวจสอบคุณภาพน้ำ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #07090f;
+      --bg-grad:   radial-gradient(ellipse at top, #111827 0%, #07090f 60%);
+      --surface:   rgba(255,255,255,0.025);
+      --surface-2: rgba(255,255,255,0.04);
+      --border:    rgba(148,163,184,0.08);
+      --border-strong: rgba(148,163,184,0.16);
+      --text:      #e6ecf5;
+      --text-dim:  #94a3b8;
+      --text-mute: #64748b;
+      --blue:      #38bdf8;
+      --orange:    #fb923c;
+      --green:     #4ade80;
+      --red:       #f87171;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'IBM Plex Sans Thai', 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg);
+      background-image: var(--bg-grad);
+      background-attachment: fixed;
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      letter-spacing: -0.01em;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 24px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header h1 {
+      font-size: 1.4rem; font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    header p {
+      font-size: 0.78rem; color: var(--text-mute); margin-top: 4px;
+    }
+
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    #conn-badge, #esp-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.78rem; padding: 7px 14px;
+      border-radius: 999px; font-weight: 500;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      backdrop-filter: blur(10px);
+    }
+    #conn-dot, #esp-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text-mute); transition: all .4s;
+      box-shadow: 0 0 0 0 transparent;
+    }
+    #conn-dot.online,  #esp-dot.online  {
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(74,222,128,0.15);
+    }
+    #conn-dot.offline, #esp-dot.offline { background: var(--red); }
+
+    /* ===== MAIN GRID ===== */
+    main {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 760px) {
+      main { grid-template-columns: 1fr; padding: 0 16px; gap: 12px; }
+      header { padding: 20px 16px; }
+    }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+      backdrop-filter: blur(20px);
+      transition: border-color .3s;
+    }
+    .card:hover { border-color: var(--border-strong); }
+    .card-title {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--text-mute); margin-bottom: 18px;
+    }
+    .full-width { grid-column: 1 / -1; }
+
+    /* ===== SENSOR — HERO STYLE ===== */
+    .sensor-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .sensor-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .sensor-box::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: currentColor; opacity: 0.3;
+    }
+    .sensor-box.ec-box   { color: var(--blue); }
+    .sensor-box.temp-box { color: var(--orange); }
+    .sensor-box.warn     { color: var(--red); }
+    .sensor-label {
+      font-size: 0.72rem; color: var(--text-mute);
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: 6px; font-weight: 500;
+    }
+    .sensor-value {
+      font-family: 'Inter', sans-serif;
+      font-size: 2.6rem; font-weight: 700;
+      line-height: 1.1; transition: color .4s;
+      color: currentColor;
+      font-feature-settings: 'tnum';
+      letter-spacing: -0.03em;
+    }
+    .sensor-unit {
+      font-size: 0.78rem; color: var(--text-mute); margin-top: 8px;
+      font-weight: 500;
+    }
+
+    .ts-row {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.74rem; color: var(--text-mute);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .ts-row::before {
+      content: ''; width: 5px; height: 5px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+
+    /* ===== PUMP STATUS ===== */
+    .pump-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .pump-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .pump-name {
+      font-size: 0.82rem; font-weight: 500;
+      color: var(--text-dim);
+    }
+    .pump-state {
+      font-size: 0.85rem; font-weight: 600;
+      padding: 8px 14px; border-radius: 8px; text-align: center;
+      transition: all .3s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .pump-state::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+    }
+    .pump-state.on  {
+      background: rgba(74,222,128,0.1); color: var(--green);
+      border: 1px solid rgba(74,222,128,0.2);
+    }
+    .pump-state.on::before { animation: pulse 1.5s infinite; box-shadow: 0 0 8px currentColor; }
+    .pump-state.off {
+      background: var(--surface);
+      color: var(--text-mute); border: 1px solid var(--border);
+    }
+
+    /* ===== TOGGLE ===== */
+    .toggle-wrap {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .toggle-label { font-size: 0.85rem; color: var(--text-dim); font-weight: 500; }
+    .toggle {
+      position: relative; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0;
+      background: rgba(148,163,184,0.2); border-radius: 999px; transition: .3s;
+    }
+    .slider:before {
+      content: '';
+      position: absolute; width: 18px; height: 18px;
+      left: 3px; bottom: 3px;
+      background: var(--text); border-radius: 50%; transition: .3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    input:checked + .slider { background: var(--blue); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    /* ===== MODE BANNER ===== */
+    #mode-banner {
+      text-align: center; padding: 12px 16px;
+      border-radius: 12px; font-size: 0.85rem; font-weight: 500;
+      margin-bottom: 14px; transition: all .3s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #mode-banner.auto {
+      background: rgba(56,189,248,0.08); color: var(--blue);
+      border: 1px solid rgba(56,189,248,0.15);
+    }
+    #mode-banner.manual {
+      background: rgba(251,146,60,0.08); color: var(--orange);
+      border: 1px solid rgba(251,146,60,0.15);
+    }
+
+    /* ===== MANUAL BUTTONS ===== */
+    .btn-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      margin-top: 12px;
+    }
+    .pump-btn {
+      padding: 11px; border-radius: 10px;
+      font-size: 0.8rem; font-weight: 500;
+      cursor: pointer; border: 1px solid;
+      transition: all .2s;
+      font-family: inherit;
+    }
+    .pump-btn.on  {
+      background: rgba(74,222,128,0.08); color: var(--green);
+      border-color: rgba(74,222,128,0.2);
+    }
+    .pump-btn.off {
+      background: rgba(248,113,113,0.08); color: var(--red);
+      border-color: rgba(248,113,113,0.2);
+    }
+    .pump-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .pump-btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.15); }
+
+    /* ===== INPUTS ===== */
+    .input {
+      width: 100%; padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: 'Inter', sans-serif;
+      font-feature-settings: 'tnum';
+      transition: all .2s;
+    }
+    .input:focus { outline: none; border-color: var(--blue); background: var(--surface); }
+
+    .input-label {
+      font-size: 0.72rem; color: var(--text-mute);
+      margin-bottom: 6px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .input-hint {
+      font-size: 0.7rem; color: var(--text-mute); margin-top: 4px;
+    }
+
+    .btn-primary {
+      padding: 10px 20px; border-radius: 10px;
+      border: none; background: var(--blue);
+      color: #03192a; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+      font-family: inherit;
+    }
+    .btn-primary:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+    /* ===== CHART ===== */
+    #chart-wrap { position: relative; height: 280px; }
+
+    /* ===== ALERTS ===== */
+    #alert-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    #alert-list li {
+      padding: 11px 14px; border-radius: 10px;
+      font-size: 0.82rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--text-mute);
+      animation: alertIn .3s ease;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    }
+    @keyframes alertIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+    #alert-list li.ec   { border-left-color: var(--red);    background: rgba(248,113,113,0.04); }
+    #alert-list li.temp { border-left-color: var(--orange); background: rgba(251,146,60,0.04); }
+    #alert-list .al-time { color: var(--text-mute); font-size: 0.72rem; flex-shrink: 0; }
+    #no-alert {
+      text-align: center; color: var(--text-mute); font-size: 0.85rem; padding: 20px 0;
+    }
+
+    /* ===== PREDICTION CARD ===== */
+    .pred-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .pred-trend {
+      font-size: 1rem; font-weight: 600; margin-bottom: 10px;
+    }
+    .pred-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.78rem; color: var(--text-mute);
+      padding: 4px 0;
+    }
+    .pred-row span:last-child { color: var(--text-dim); font-weight: 500; }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.15); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.25); }
+
+    /* ===== HELPER ===== */
+    .text-muted { color: var(--text-mute); }
+  </style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div>
+    <h1>ระบบตรวจสอบคุณภาพน้ำ</h1>
+    <p>นายบะฮ์รุดดีน ยีสา </p>
+  </div>
+  <div class="badges">
+    <div id="conn-badge" title="สถานะการเชื่อมต่อระหว่างเบราว์เซอร์กับฐานข้อมูล Firebase">
+      <div id="conn-dot"></div>
+      <span id="conn-text">Firebase: กำลังเชื่อมต่อ</span>
+    </div>
+    <div id="esp-badge" title="ESP32 อัปเดตข้อมูลล่าสุดเมื่อใด ถ้าเงียบเกิน 30 วินาที = อาจดับ">
+      <div id="esp-dot"></div>
+      <span id="esp-text">ESP32: รอข้อมูล</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===== SENSORS ===== -->
+  <div class="card full-width">
+    <div class="card-title">ค่าเซนเซอร์ล่าสุด</div>
+    <div class="sensor-row">
+      <div class="sensor-box ec-box" id="ec-box">
+        <div class="sensor-label">EC · ความเค็ม</div>
+        <div class="sensor-value" id="ec-val">—</div>
+        <div class="sensor-unit">µS/cm</div>
+      </div>
+      <div class="sensor-box temp-box" id="temp-box">
+        <div class="sensor-label">อุณหภูมิน้ำ</div>
+        <div class="sensor-value" id="temp-val">—</div>
+        <div class="sensor-unit">°C</div>
+      </div>
+    </div>
+    <div class="ts-row">
+      <span>อัปเดต <span id="ts-val">—</span></span>
+    </div>
+  </div>
+
+  <!-- ===== PUMP STATUS ===== -->
+  <div class="card">
+    <div class="card-title">สถานะปั๊มน้ำ</div>
+    <div class="pump-grid">
+      <div class="pump-card">
+        <div class="pump-name">ปั๊มน้ำบริสุทธิ์</div>
+        <div class="pump-state off" id="pump-pure-state">ปิด</div>
+      </div>
+      <div class="pump-card">
+        <div class="pump-name">ปั๊มหล่อเย็น</div>
+        <div class="pump-state off" id="pump-cool-state">ปิด</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MANUAL CONTROL ===== -->
+  <div class="card">
+    <div class="card-title">ควบคุมปั๊ม</div>
+    <div id="mode-banner" class="auto">โหมดอัตโนมัติ · ระบบควบคุมเอง</div>
+    <div class="toggle-wrap">
+      <span class="toggle-label">เปิดโหมด Manual</span>
+      <label class="toggle">
+        <input type="checkbox" id="manual-toggle" onchange="toggleManualMode(this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="btn-grid">
+      <button class="pump-btn on"  id="btn-pure-on"  disabled onclick="cmdPump('pump_pure', true)">เปิดปั๊มบริสุทธิ์</button>
+      <button class="pump-btn off" id="btn-pure-off" disabled onclick="cmdPump('pump_pure', false)">ปิดปั๊มบริสุทธิ์</button>
+      <button class="pump-btn on"  id="btn-cool-on"  disabled onclick="cmdPump('pump_cool', true)">เปิดปั๊มหล่อเย็น</button>
+      <button class="pump-btn off" id="btn-cool-off" disabled onclick="cmdPump('pump_cool', false)">ปิดปั๊มหล่อเย็น</button>
+    </div>
+  </div>
+
+  <!-- ===== ALERTS ===== -->
+  <div class="card full-width">
+    <div class="card-title">การแจ้งเตือน</div>
+    <ul id="alert-list">
+      <li id="no-alert">ยังไม่มีการแจ้งเตือน</li>
+    </ul>
+  </div>
+
+  <!-- ===== SETTINGS ===== -->
+  <div class="card full-width">
+    <div class="card-title">ตั้งค่าเกณฑ์การแจ้งเตือน</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:16px">
+      <div>
+        <div class="input-label">EC สูงสุด</div>
+        <input id="set-ec-max" class="input" type="number" min="0" max="20000" step="50">
+        <div class="input-hint">เกินนี้ → เปิดปั๊มบริสุทธิ์</div>
+      </div>
+      <div>
+        <div class="input-label">EC ปกติ</div>
+        <input id="set-ec-normal" class="input" type="number" min="0" max="20000" step="50">
+        <div class="input-hint">ต่ำกว่านี้ → ปิดปั๊มบริสุทธิ์</div>
+      </div>
+      <div>
+        <div class="input-label">Temp สูงสุด</div>
+        <input id="set-temp-max" class="input" type="number" min="0" max="100" step="0.5">
+        <div class="input-hint">เกินนี้ → เปิดปั๊มหล่อเย็น</div>
+      </div>
+      <div>
+        <div class="input-label">Temp ปกติ</div>
+        <input id="set-temp-normal" class="input" type="number" min="0" max="100" step="0.5">
+        <div class="input-hint">ต่ำกว่านี้ → ปิดปั๊มหล่อเย็น</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button id="btn-save-settings" class="btn-primary">บันทึกค่า</button>
+      <span id="save-status" style="font-size:0.8rem;color:var(--text-mute)"></span>
+    </div>
+    <div class="input-hint" style="margin-top:12px">
+      ESP32 จะอ่านค่าใหม่ในรอบถัดไป (ทุก 30 วินาที)
+    </div>
+  </div>
+
+  <!-- ===== WEATHER ===== -->
+  <div class="card full-width">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span>สภาพอากาศ</span>
+      <span id="weather-loc" class="text-muted" style="font-size:.72rem;text-transform:none;letter-spacing:0">กำลังโหลด...</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">ตอนนี้</div>
+        <div id="wx-now" style="font-size:1.6rem;font-weight:700;line-height:1">—</div>
+        <div id="wx-desc" class="text-muted" style="font-size:0.78rem;margin-top:6px">—</div>
+      </div>
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">ความชื้น</div>
+        <div id="wx-humid" style="font-size:1.6rem;font-weight:700;line-height:1">—</div>
+        <div class="text-muted" style="font-size:0.78rem;margin-top:6px">RH</div>
+      </div>
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">+1 ชม.</div>
+        <div id="wx-1h" style="font-size:1.6rem;font-weight:700;line-height:1">—</div>
+        <div id="wx-1h-delta" class="text-muted" style="font-size:0.78rem;margin-top:6px">—</div>
+      </div>
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">+3 ชม.</div>
+        <div id="wx-3h" style="font-size:1.6rem;font-weight:700;line-height:1">—</div>
+        <div id="wx-3h-delta" class="text-muted" style="font-size:0.78rem;margin-top:6px">—</div>
+      </div>
+    </div>
+    <div class="input-hint" style="margin-top:10px">ข้อมูลจาก Open-Meteo API · ปรับการพยากรณ์น้ำตามแนวโน้มอากาศ</div>
+  </div>
+
+  <!-- ===== PREDICTION (Linear Regression + Weather) ===== -->
+  <div class="card full-width">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>พยากรณ์แนวโน้ม (ผสมสภาพอากาศ)</span>
+      <span id="pred-status" class="text-muted" style="font-size:.72rem;text-transform:none;letter-spacing:0"></span>
+    </div>
+    <div id="pred-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.72rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">EC · µS/cm</div>
+        <div id="pred-ec-trend" class="pred-trend">—</div>
+        <div class="pred-row"><span>+30 นาที (เดิม)</span><span id="pred-ec-30" style="color:var(--blue)">—</span></div>
+        <div class="pred-row"><span>+30 นาที (ผสมอากาศ)</span><span id="pred-ec-30-wx" style="color:var(--blue);font-weight:600">—</span></div>
+        <div class="pred-row"><span>+60 นาที (ผสมอากาศ)</span><span id="pred-ec-60-wx" style="color:var(--blue);font-weight:600">—</span></div>
+        <div class="pred-row"><span>R² · weight</span><span id="pred-ec-r2">—</span></div>
+        <div id="pred-ec-warn" style="color:var(--red);font-size:0.74rem;margin-top:8px"></div>
+      </div>
+      <div class="pred-box">
+        <div class="text-muted" style="font-size:0.72rem;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">อุณหภูมิ · °C</div>
+        <div id="pred-temp-trend" class="pred-trend">—</div>
+        <div class="pred-row"><span>+30 นาที (เดิม)</span><span id="pred-temp-30" style="color:var(--orange)">—</span></div>
+        <div class="pred-row"><span>+30 นาที (ผสมอากาศ)</span><span id="pred-temp-30-wx" style="color:var(--orange);font-weight:600">—</span></div>
+        <div class="pred-row"><span>+60 นาที (ผสมอากาศ)</span><span id="pred-temp-60-wx" style="color:var(--orange);font-weight:600">—</span></div>
+        <div class="pred-row"><span>R² · weight</span><span id="pred-temp-r2">—</span></div>
+        <div id="pred-temp-warn" style="color:var(--red);font-size:0.74rem;margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="input-hint" style="margin-top:10px">
+      Linear Regression จากข้อมูลย้อนหลัง + ปรับด้วยพยากรณ์อุณหภูมิอากาศจาก Open-Meteo · ต้องมีข้อมูล ≥ 5 จุด
+    </div>
+  </div>
+
+  <!-- ===== HISTORY CHART ===== -->
+  <div class="card full-width">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>ประวัติวันนี้</span>
+      <span id="chart-status" class="text-muted" style="font-size:.72rem;text-transform:none;letter-spacing:0">กำลังโหลด...</span>
+    </div>
+    <div id="chart-wrap">
+      <canvas id="historyChart"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<script type="module">
+import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getDatabase, ref, onValue, update, get, set } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js';
+
+// ============================================================
+//  Firebase Config
+// ============================================================
+const firebaseConfig = {
+  apiKey:            "AIzaSyCKDkHEAiNcWRNmh1WJRIoWo4Vz7w8q9Qo",
+  authDomain:        "realtimedbproject-29431.firebaseapp.com",
+  databaseURL:       "https://realtimedbproject-29431-default-rtdb.firebaseio.com",
+  projectId:         "realtimedbproject-29431",
+  storageBucket:     "realtimedbproject-29431.firebasestorage.app",
+  messagingSenderId: "65448565102",
+  appId:             "1:65448565102:web:318884b441f979280c097f"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ============================================================
+//  Thresholds (ต้องตรงกับ main.ino)
+// ============================================================
+let EC_MAX   = 2000;
+let TEMP_MAX = 30;
+
+// ============================================================
+//  ตัวแปร state
+// ============================================================
+let chart        = null;
+let alertHistory = [];
+
+// ============================================================
+//  Firebase helpers
+// ============================================================
+function fbUpdate(path, data) {
+  update(ref(db, path), data).catch(e => console.error('[Firebase write]', e));
+}
+
+// ============================================================
+//  Real-time listener — Firebase SDK onValue
+// ============================================================
+function startStream() {
+  onValue(ref(db, '/realtime'),
+    snap => {
+      const d = snap.val();
+      if (d) updateRealtime(d);
+      setConnected(true);
+    },
+    err => {
+      console.error('[Firebase]', err);
+      setConnected(false);
+    }
+  );
+}
+
+// ============================================================
+//  อัปเดต UI จากข้อมูล realtime
+// ============================================================
+function updateRealtime(d) {
+  if (!d || typeof d !== 'object') return;
+
+  // EC — ตรวจ type ก่อนเรียก toFixed กัน crash ถ้าได้ string
+  const ecNum = (typeof d.ec === 'number' && !isNaN(d.ec)) ? d.ec : null;
+  document.getElementById('ec-val').textContent = ecNum != null ? ecNum.toFixed(1) : '—';
+  document.getElementById('ec-box').classList.toggle('warn', ecNum != null && ecNum > EC_MAX);
+
+  // Temp
+  const tNum = (typeof d.temperature === 'number' && !isNaN(d.temperature)) ? d.temperature : null;
+  const tShow = (tNum != null && tNum !== -999) ? tNum.toFixed(1) : '—';
+  document.getElementById('temp-val').textContent = tShow;
+  document.getElementById('temp-box').classList.toggle('warn', tNum != null && tNum !== -999 && tNum > TEMP_MAX);
+
+  // Timestamp
+  document.getElementById('ts-val').textContent =
+    d.timestamp ? d.timestamp.replace('T', ' ') : '—';
+
+  // อัปเดตสถานะ ESP32
+  updateEspFromTimestamp(d.timestamp);
+
+  // Pump states
+  setPumpState('pump-pure-state', d.pump_pure);
+  setPumpState('pump-cool-state', d.pump_cool);
+
+  // Manual mode
+  if (document.getElementById('manual-toggle').checked !== !!d.manual_mode) {
+    document.getElementById('manual-toggle').checked = !!d.manual_mode;
+    applyManualUI(!!d.manual_mode);
+  }
+
+  // Alerts
+  checkAlerts(d);
+}
+
+function setPumpState(id, state) {
+  const el = document.getElementById(id);
+  el.textContent = state ? 'เปิด' : 'ปิด';
+  el.className   = 'pump-state ' + (state ? 'on' : 'off');
+}
+
+// ============================================================
+//  สถานะการเชื่อมต่อ
+// ============================================================
+function setConnected(ok) {
+  document.getElementById('conn-dot').className   = ok ? 'online' : 'offline';
+  document.getElementById('conn-text').textContent = ok
+    ? 'Firebase: เชื่อมต่อแล้ว'
+    : 'Firebase: ขาดการเชื่อมต่อ';
+}
+
+// ============================================================
+//  สถานะ ESP32 — เช็คจาก /realtime.timestamp ที่ ESP32 อัปเดตทุก 10 วินาที
+//  ถ้าเงียบเกิน 30 วินาที = อาจดับ/หลุดเน็ต
+// ============================================================
+let lastEspTimestamp = null;
+
+function setEspStatus(online, ageSec = null) {
+  const dot  = document.getElementById('esp-dot');
+  const text = document.getElementById('esp-text');
+  dot.className = online ? 'online' : 'offline';
+  if (online) {
+    text.textContent = ageSec != null
+      ? `ESP32: ออนไลน์ · ${ageSec}s`
+      : 'ESP32: ออนไลน์';
+  } else {
+    text.textContent = ageSec != null
+      ? `ESP32: ออฟไลน์ · เงียบ ${ageSec}s`
+      : 'ESP32: ออฟไลน์';
+  }
+}
+
+// อัปเดตทุกครั้งที่ realtime data เปลี่ยน
+function updateEspFromTimestamp(ts) {
+  if (!ts) return;
+  // timestamp รูปแบบ "YYYY-MM-DDTHH:MM:SS" (UTC+7) หรือ "millis_xxx"
+  if (ts.startsWith('millis_')) {
+    lastEspTimestamp = Date.now();
+  } else {
+    // parse เป็น Bangkok time
+    lastEspTimestamp = new Date(ts + '+07:00').getTime();
+  }
+}
+
+// ตรวจอายุข้อมูลทุก 5 วินาที
+setInterval(() => {
+  if (lastEspTimestamp == null) {
+    setEspStatus(false);
+    return;
+  }
+  const ageSec = Math.floor((Date.now() - lastEspTimestamp) / 1000);
+  setEspStatus(ageSec < 30, ageSec);
+}, 5000);
+
+// ============================================================
+//  Manual Mode
+// ============================================================
+function toggleManualMode(on) {
+  fbUpdate('/control', { manual_mode: on });
+  applyManualUI(on);
+}
+
+function applyManualUI(on) {
+  const banner = document.getElementById('mode-banner');
+  banner.textContent = on ? 'โหมด Manual · คุณควบคุมเอง' : 'โหมดอัตโนมัติ · ระบบควบคุมเอง';
+  banner.className   = on ? 'manual' : 'auto';
+
+  ['btn-pure-on','btn-pure-off','btn-cool-on','btn-cool-off'].forEach(id => {
+    document.getElementById(id).disabled = !on;
+  });
+}
+
+function cmdPump(pump, state) {
+  fbUpdate(`/control/${pump}`, { command: state });
+}
+
+// ============================================================
+//  Alerts
+// ============================================================
+function checkAlerts(d) {
+  const now = new Date().toLocaleTimeString('th-TH');
+  if (d.ec != null && d.ec > EC_MAX) {
+    addAlert('ec', `EC สูงเกิน ${EC_MAX} µS/cm (${d.ec.toFixed(1)})`, now);
+  }
+  if (d.temperature != null && d.temperature !== -999 && d.temperature > TEMP_MAX) {
+    addAlert('temp', `อุณหภูมิสูงเกิน ${TEMP_MAX}°C (${d.temperature.toFixed(1)}°C)`, now);
+  }
+}
+
+function addAlert(type, msg, time) {
+  const key = type + '_' + Math.floor(Date.now() / 60000); // กันซ้ำต่อนาที
+  if (alertHistory.includes(key)) return;
+  alertHistory.push(key);
+  if (alertHistory.length > 50) alertHistory.shift();
+
+  const noAlert = document.getElementById('no-alert');
+  if (noAlert) noAlert.remove();
+
+  const li = document.createElement('li');
+  li.className = type;
+  li.innerHTML = `${msg} <span class="al-time">${time}</span>`;
+  const list = document.getElementById('alert-list');
+  list.insertBefore(li, list.firstChild);
+  if (list.children.length > 10) list.removeChild(list.lastChild);
+}
+
+// ============================================================
+//  Helpers — timezone-safe parsing
+// ============================================================
+function parseEspTime(ts) {
+  if (typeof ts !== 'string' || ts.length === 0) return NaN;
+  if (ts.startsWith('millis_')) return Date.now();
+  // ตรวจ format ก่อนแปลง — กัน garbage data ทำให้ chart พัง
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(ts)) {
+    const fallback = new Date(ts).getTime();
+    return isNaN(fallback) ? NaN : fallback;
+  }
+  return new Date(ts + '+07:00').getTime();
+}
+
+// ============================================================
+//  Linear Regression (Least Squares) — ตรงกับ tests/lib.mjs
+// ============================================================
+function linearRegression(points) {
+  const n = points.length;
+  if (n < 2) return null;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (const { x, y } of points) {
+    sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
+  }
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return null;
+  const slope     = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  const meanY = sumY / n;
+  let ssTot = 0, ssRes = 0;
+  for (const { x, y } of points) {
+    ssTot += (y - meanY) ** 2;
+    ssRes += (y - (slope * x + intercept)) ** 2;
+  }
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot;
+  return { slope, intercept, r2, n, predict: x => slope * x + intercept };
+}
+
+function timeToThreshold(model, current, threshold) {
+  if (!model || model.slope === 0 || !isFinite(model.slope)) return null;
+  const min = (threshold - current) / model.slope;
+  return (min <= 0 || !isFinite(min)) ? null : min;
+}
+
+function trendLabel(slope, unit) {
+  if (typeof slope !== 'number' || isNaN(slope)) return { text: 'ไม่ทราบ', color: '#94a3b8' };
+  if (Math.abs(slope) < 0.01) return { text: 'คงที่', color: '#94a3b8' };
+  const rate = Math.abs(slope * 60).toFixed(2);
+  if (slope > 0) return { text: `เพิ่มขึ้น ${rate} ${unit}/ชม.`, color: '#fb923c' };
+  return { text: `ลดลง ${rate} ${unit}/ชม.`, color: '#22c55e' };
+}
+
+// ============================================================
+//  Weather API (Open-Meteo — ฟรี ไม่ต้อง key)
+//  ใช้พยากรณ์อุณหภูมิอากาศ + ความชื้น มาผสมกับ regression ของน้ำ
+// ============================================================
+const DEFAULT_LOC = { lat: 6.8676, lon: 101.2547, name: 'ม.อ.ปัตตานี' };
+let currentWeather = null;  // { current, hourly, location }
+
+function pickWeatherWeight(model) {
+  if (!model || model.r2 == null) return 0.3;
+  if (model.r2 < 0.3) return 0.6;
+  if (model.r2 < 0.6) return 0.4;
+  if (model.r2 < 0.85) return 0.3;
+  return 0.15;
+}
+
+function weatherCodeToText(code) {
+  if (code == null) return '—';
+  if (code === 0) return 'แจ่มใส';
+  if (code <= 3)  return 'มีเมฆบางส่วน';
+  if (code <= 48) return 'หมอก';
+  if (code <= 57) return 'ฝนปรอย';
+  if (code <= 67) return 'ฝนตก';
+  if (code <= 77) return 'หิมะ';
+  if (code <= 82) return 'ฝนตกหนัก';
+  if (code <= 86) return 'หิมะตกหนัก';
+  if (code <= 99) return 'พายุฝนฟ้าคะนอง';
+  return '—';
+}
+
+// ดึงตำแหน่งผู้ใช้ — ถ้าไม่ได้ใช้ตำแหน่ง default (ปัตตานี)
+async function getLocation() {
+  if (!navigator.geolocation) return DEFAULT_LOC;
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, name: 'ตำแหน่งปัจจุบัน' }),
+      ()  => resolve(DEFAULT_LOC),
+      { timeout: 5000, maximumAge: 600000 }
+    );
+  });
+}
+
+// ดึง forecast 24 ชั่วโมง
+async function fetchWeather() {
+  try {
+    const loc = await getLocation();
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}` +
+      `&current=temperature_2m,relative_humidity_2m,weather_code` +
+      `&hourly=temperature_2m,relative_humidity_2m` +
+      `&timezone=Asia/Bangkok&forecast_days=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('weather api failed');
+    const data = await res.json();
+    currentWeather = { ...data, location: loc };
+    renderWeather();
+    return currentWeather;
+  } catch (e) {
+    console.error('[Weather]', e);
+    document.getElementById('weather-loc').textContent = 'โหลดไม่สำเร็จ — ใช้พยากรณ์เดิม';
+    return null;
+  }
+}
+
+function renderWeather() {
+  if (!currentWeather) return;
+  const { current, hourly, location } = currentWeather;
+  document.getElementById('weather-loc').textContent =
+    `${location.name} · อัปเดต ${new Date(current.time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`;
+  document.getElementById('wx-now').textContent  = current.temperature_2m.toFixed(1) + '°';
+  document.getElementById('wx-desc').textContent = weatherCodeToText(current.weather_code);
+  document.getElementById('wx-humid').textContent = Math.round(current.relative_humidity_2m) + '%';
+
+  // หา index ใน hourly ที่ตรงกับ "ตอนนี้" แล้ว +1, +3 ชม.
+  const nowMs = Date.now();
+  const times = hourly.time.map(t => new Date(t + '+07:00').getTime());
+  let nowIdx = 0;
+  for (let i = 0; i < times.length; i++) if (times[i] <= nowMs) nowIdx = i;
+  const at = (offsetHr) => Math.min(nowIdx + offsetHr, hourly.temperature_2m.length - 1);
+
+  const t1 = hourly.temperature_2m[at(1)];
+  const t3 = hourly.temperature_2m[at(3)];
+  const cur = current.temperature_2m;
+  document.getElementById('wx-1h').textContent = t1.toFixed(1) + '°';
+  document.getElementById('wx-3h').textContent = t3.toFixed(1) + '°';
+  const fmtDelta = (d) => (d > 0 ? '+' : '') + d.toFixed(1) + '°';
+  document.getElementById('wx-1h-delta').textContent = fmtDelta(t1 - cur);
+  document.getElementById('wx-3h-delta').textContent = fmtDelta(t3 - cur);
+}
+
+// คืนอุณหภูมิอากาศที่ N นาทีจากตอนนี้
+// (Open-Meteo คืน time string ตาม timezone request — ใส่ +07:00 ให้ชัด ทำงานทุก browser TZ)
+function getAirTempInMinutes(minutes) {
+  if (!currentWeather) return null;
+  const nowMs = Date.now();
+  const targetMs = nowMs + minutes * 60000;
+  const times = currentWeather.hourly.time.map(t => new Date(t + '+07:00').getTime());
+  // หาช่วงที่ใกล้สุด — ใช้ linear interpolation
+  for (let i = 0; i < times.length - 1; i++) {
+    if (times[i] <= targetMs && targetMs <= times[i + 1]) {
+      const t0 = times[i], t1 = times[i + 1];
+      const v0 = currentWeather.hourly.temperature_2m[i];
+      const v1 = currentWeather.hourly.temperature_2m[i + 1];
+      const ratio = (targetMs - t0) / (t1 - t0);
+      return v0 + (v1 - v0) * ratio;
+    }
+  }
+  return currentWeather.hourly.temperature_2m[currentWeather.hourly.temperature_2m.length - 1];
+}
+
+// อัปเดต UI พยากรณ์ (ผสม weather)
+function updatePrediction(history) {
+  const status = document.getElementById('pred-status');
+  if (history.length < 5) {
+    status.textContent = `ต้องการอย่างน้อย 5 จุด (มี ${history.length})`;
+    return null;
+  }
+
+  const t0 = parseEspTime(history[0].timestamp);
+  const ecPoints = [], tempPoints = [];
+  for (const e of history) {
+    const xMin = (parseEspTime(e.timestamp) - t0) / 60000;
+    if (e.ec != null) ecPoints.push({ x: xMin, y: e.ec });
+    if (e.temperature != null && e.temperature !== -999)
+      tempPoints.push({ x: xMin, y: e.temperature });
+  }
+
+  const lastX = (parseEspTime(history[history.length - 1].timestamp) - t0) / 60000;
+  const ecModel   = linearRegression(ecPoints);
+  const tempModel = linearRegression(tempPoints);
+
+  const hasWeather = currentWeather != null;
+  status.textContent = `วิเคราะห์จาก ${history.length} จุด${hasWeather ? ' + พยากรณ์อากาศ' : ' (ไม่มีข้อมูลอากาศ)'}`;
+
+  // อุณหภูมิอากาศปัจจุบัน + ที่ +30, +60 นาที
+  const airNow = hasWeather ? currentWeather.current.temperature_2m : null;
+  const air30  = hasWeather ? getAirTempInMinutes(30) : null;
+  const air60  = hasWeather ? getAirTempInMinutes(60) : null;
+
+  // ===== EC ===== (น้ำร้อน → ระเหย → EC สูง — ใช้ weight เล็กกว่า temp)
+  if (ecModel) {
+    const t = trendLabel(ecModel.slope, 'µS/cm');
+    const trendEl = document.getElementById('pred-ec-trend');
+    trendEl.textContent = t.text;
+    trendEl.style.color = t.color;
+
+    const wEc = pickWeatherWeight(ecModel) * 0.5;  // EC ไวต่อสภาพอากาศน้อยกว่า temp
+    const ec30Pure = ecModel.predict(lastX + 30);
+    const ec60Pure = ecModel.predict(lastX + 60);
+    // EC น่าจะขึ้นตามอุณหภูมิ → adj ต่อ 1°C ≈ 50 µS/cm (heuristic)
+    const ec30Adj = hasWeather ? ec30Pure + (air30 - airNow) * 50 * wEc : ec30Pure;
+    const ec60Adj = hasWeather ? ec60Pure + (air60 - airNow) * 50 * wEc : ec60Pure;
+
+    document.getElementById('pred-ec-30').textContent     = ec30Pure.toFixed(0) + ' µS/cm';
+    document.getElementById('pred-ec-30-wx').textContent  = ec30Adj.toFixed(0) + ' µS/cm';
+    document.getElementById('pred-ec-60-wx').textContent  = ec60Adj.toFixed(0) + ' µS/cm';
+    document.getElementById('pred-ec-r2').textContent     = `${(ecModel.r2 * 100).toFixed(0)}% · w=${wEc.toFixed(2)}`;
+
+    const lastEc = ecPoints[ecPoints.length - 1].y;
+    const tToMax = timeToThreshold({ slope: ecModel.slope }, lastEc, EC_MAX);
+    document.getElementById('pred-ec-warn').textContent = tToMax && tToMax < 120
+      ? `จะเกินเกณฑ์ใน ${tToMax.toFixed(0)} นาที` : '';
+  }
+
+  // ===== Temperature ===== (ใช้ weight เต็มตาม R²)
+  if (tempModel) {
+    const t = trendLabel(tempModel.slope, '°C');
+    const trendEl = document.getElementById('pred-temp-trend');
+    trendEl.textContent = t.text;
+    trendEl.style.color = t.color;
+
+    const wT = pickWeatherWeight(tempModel);
+    const t30Pure = tempModel.predict(lastX + 30);
+    const t60Pure = tempModel.predict(lastX + 60);
+    const t30Adj = hasWeather ? t30Pure + (air30 - airNow) * wT : t30Pure;
+    const t60Adj = hasWeather ? t60Pure + (air60 - airNow) * wT : t60Pure;
+
+    document.getElementById('pred-temp-30').textContent    = t30Pure.toFixed(1) + ' °C';
+    document.getElementById('pred-temp-30-wx').textContent = t30Adj.toFixed(1) + ' °C';
+    document.getElementById('pred-temp-60-wx').textContent = t60Adj.toFixed(1) + ' °C';
+    document.getElementById('pred-temp-r2').textContent    = `${(tempModel.r2 * 100).toFixed(0)}% · w=${wT.toFixed(2)}`;
+
+    const lastTemp = tempPoints[tempPoints.length - 1].y;
+    const tToMax = timeToThreshold({ slope: tempModel.slope }, lastTemp, TEMP_MAX);
+    document.getElementById('pred-temp-warn').textContent = tToMax && tToMax < 120
+      ? `จะเกินเกณฑ์ใน ${tToMax.toFixed(0)} นาที` : '';
+  }
+
+  return { ecModel, tempModel, lastX };
+}
+
+// ============================================================
+//  Chart ประวัติ
+// ============================================================
+async function loadHistory() {
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Bangkok' });
+  let raw = null;
+  try {
+    const snap = await get(ref(db, `/history/${today}`));
+    raw = snap.val();
+  } catch (e) {
+    console.error('[History] โหลดล้มเหลว:', e);
+    document.getElementById('chart-status').textContent = 'โหลดประวัติไม่ได้ — ลองใหม่ใน 2 นาที';
+    return;
+  }
+
+  const labels = [], ecData = [], tempData = [];
+  let entries = [];
+
+  if (raw) {
+    entries = Object.values(raw).sort((a, b) =>
+      (a.timestamp || '').localeCompare(b.timestamp || ''));
+    entries.forEach(e => {
+      labels.push(e.timestamp ? e.timestamp.slice(11, 16) : '');
+      ecData.push(e.ec   != null ? +e.ec.toFixed(1)          : null);
+      tempData.push(e.temperature != null && e.temperature !== -999
+        ? +e.temperature.toFixed(1) : null);
+    });
+    document.getElementById('chart-status').textContent = '';
+  } else {
+    document.getElementById('chart-status').textContent = 'ยังไม่มีข้อมูลวันนี้';
+  }
+
+  // อัปเดตพยากรณ์ก่อนวาดกราฟ — เก็บไว้ extend chart
+  const pred = updatePrediction(entries);
+
+  // ถ้ามี model → ต่อเส้นพยากรณ์ 6 จุด (ทุก 10 นาที = 1 ชม.)
+  const predEcData = ecData.map(() => null);
+  const predTempData = tempData.map(() => null);
+  if (pred && (pred.ecModel || pred.tempModel)) {
+    // เชื่อมจุดสุดท้ายของ actual กับ prediction
+    if (pred.ecModel)   predEcData[predEcData.length - 1] = ecData[ecData.length - 1];
+    if (pred.tempModel) predTempData[predTempData.length - 1] = tempData[tempData.length - 1];
+
+    const lastMs = parseEspTime(entries[entries.length - 1].timestamp);
+    for (let i = 1; i <= 6; i++) {
+      const t = new Date(lastMs + i * 10 * 60000);
+      labels.push(t.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' }));
+      ecData.push(null);
+      tempData.push(null);
+      predEcData.push(pred.ecModel   ? +pred.ecModel.predict(pred.lastX   + i * 10).toFixed(1) : null);
+      predTempData.push(pred.tempModel ? +pred.tempModel.predict(pred.lastX + i * 10).toFixed(1) : null);
+    }
+  }
+
+  const ctx = document.getElementById('historyChart').getContext('2d');
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'EC (µS/cm)',
+          data: ecData,
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,.1)',
+          tension: .4, pointRadius: 2, yAxisID: 'yEC',
+        },
+        {
+          label: 'EC พยากรณ์',
+          data: predEcData,
+          borderColor: '#38bdf8',
+          borderDash: [6, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0, yAxisID: 'yEC',
+          spanGaps: true,
+        },
+        {
+          label: 'อุณหภูมิ (°C)',
+          data: tempData,
+          borderColor: '#fb923c',
+          backgroundColor: 'rgba(251,146,60,.1)',
+          tension: .4, pointRadius: 2, yAxisID: 'yTemp',
+        },
+        {
+          label: 'อุณหภูมิ พยากรณ์',
+          data: predTempData,
+          borderColor: '#fb923c',
+          borderDash: [6, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0, yAxisID: 'yTemp',
+          spanGaps: true,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 12 } } }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#475569', maxTicksLimit: 12 },
+          grid:  { color: '#1e293b' }
+        },
+        yEC: {
+          type: 'linear', position: 'left',
+          ticks: { color: '#38bdf8' },
+          grid:  { color: '#1e3a5f33' },
+          title: { display: true, text: 'EC µS/cm', color: '#38bdf8' }
+        },
+        yTemp: {
+          type: 'linear', position: 'right',
+          ticks: { color: '#fb923c' },
+          grid:  { drawOnChartArea: false },
+          title: { display: true, text: '°C', color: '#fb923c' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+//  Settings — โหลดและบันทึกค่า threshold
+// ============================================================
+const DEFAULT_SETTINGS = { ec_max: 2000, ec_normal: 1500, temp_max: 30, temp_normal: 28 };
+
+onValue(ref(db, 'settings'), snap => {
+  const s = { ...DEFAULT_SETTINGS, ...(snap.val() || {}) };
+  EC_MAX   = s.ec_max;
+  TEMP_MAX = s.temp_max;
+  // ไม่เขียนทับช่องที่ user กำลัง focus อยู่ (กันค่าหายตอนกรอก)
+  const setIfNotFocused = (id, v) => {
+    const el = document.getElementById(id);
+    if (document.activeElement !== el) el.value = v;
+  };
+  setIfNotFocused('set-ec-max',      s.ec_max);
+  setIfNotFocused('set-ec-normal',   s.ec_normal);
+  setIfNotFocused('set-temp-max',    s.temp_max);
+  setIfNotFocused('set-temp-normal', s.temp_normal);
+});
+
+document.getElementById('btn-save-settings').addEventListener('click', () => {
+  const ecMax      = parseFloat(document.getElementById('set-ec-max').value);
+  const ecNormal   = parseFloat(document.getElementById('set-ec-normal').value);
+  const tempMax    = parseFloat(document.getElementById('set-temp-max').value);
+  const tempNormal = parseFloat(document.getElementById('set-temp-normal').value);
+  const status     = document.getElementById('save-status');
+
+  const fail = (m) => { status.style.color = '#ef4444'; status.textContent = m; };
+
+  if (isNaN(ecMax) || isNaN(ecNormal) || isNaN(tempMax) || isNaN(tempNormal))
+    return fail('กรอกค่าให้ครบ');
+  if (ecMax    <= 0  || ecMax    > 20000) return fail('EC สูงสุดต้อง 1-20000');
+  if (ecNormal <  0  || ecNormal > 20000) return fail('EC ปกติต้อง 0-20000');
+  if (tempMax  <= 0  || tempMax  > 100)   return fail('Temp สูงสุดต้อง 1-100');
+  if (tempNormal < 0 || tempNormal > 100) return fail('Temp ปกติต้อง 0-100');
+  if (ecNormal >= ecMax)    return fail('EC ปกติต้องน้อยกว่า EC สูงสุด');
+  if (tempNormal >= tempMax) return fail('Temp ปกติต้องน้อยกว่า Temp สูงสุด');
+
+  set(ref(db, 'settings'), { ec_max: ecMax, ec_normal: ecNormal, temp_max: tempMax, temp_normal: tempNormal })
+    .then(() => {
+      status.style.color = '#22c55e'; status.textContent = 'บันทึกแล้ว';
+      setTimeout(() => { status.textContent = ''; }, 3000);
+    })
+    .catch(() => { status.style.color = '#ef4444'; status.textContent = 'บันทึกไม่สำเร็จ'; });
+});
+
+// ============================================================
+//  expose ฟังก์ชันที่ HTML เรียกผ่าน onclick
+// ============================================================
+window.toggleManualMode = toggleManualMode;
+window.cmdPump          = cmdPump;
+
+// ============================================================
+//  เริ่มต้น — โหลด weather ก่อน เพื่อให้รอบแรกของ loadHistory ใช้ weather ผสมได้
+// ============================================================
+startStream();
+fetchWeather().finally(() => loadHistory());
+
+// รีเฟรช loop
+setInterval(loadHistory, 120000);   // กราฟทุก 2 นาที
+// weather ทุก 15 นาที — โหลดเสร็จแล้ว refresh พยากรณ์ทันที (ไม่รอ 2 นาที)
+setInterval(() => fetchWeather().finally(() => loadHistory()), 15 * 60 * 1000);
+</script>
+</body>
+</html>
