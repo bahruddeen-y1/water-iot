@@ -33,10 +33,10 @@ const char* WIFI_PASS_LIST[WIFI_COUNT] = {
 //     ให้คอมเมนต์บรรทัด firebaseio.com แล้วใช้บรรทัดล่างแทน
 // ============================================================
 // เลือกใช้บรรทัดที่ตรงกับ region ของ database (เช็คใน Firebase Console → Realtime Database → ดู URL)
-#define FIREBASE_HOST   "realtimedbproject-29431-default-rtdb.firebaseio.com"
+#define FIREBASE_HOST   ""
 // #define FIREBASE_HOST "realtimedbproject-29431-default-rtdb.asia-southeast1.firebasedatabase.app"
 
-#define FIREBASE_AUTH   "tuDPo4wwlBYoblndbKILmt7APaOZI0kfFIVZ1HVt"
+#define FIREBASE_AUTH   ""
 
 // ============================================================
 //  Discord Webhook
@@ -49,7 +49,7 @@ const char* WIFI_PASS_LIST[WIFI_COUNT] = {
 //    - อุณหภูมิ > 30°C
 //    (cooldown 5 นาที/ประเภท กันสแปม)
 // ============================================================
-#define DISCORD_WEBHOOK_URL "https://discord.com/api/webhooks/1502189493170602065/-Dd5xSee3Aag6D-zgsCjfOYU--Kxp-tZAWqmilaV8ydeIPO3ZDYfE0rju7FendTl97Yt"
+#define DISCORD_WEBHOOK_URL ""
 
 // ============================================================
 //  การ Calibrate เซนเซอร์ EC
